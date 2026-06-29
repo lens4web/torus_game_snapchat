@@ -26,7 +26,7 @@ The scene is structured to handle UI, 3D tracking, and physics independently. He
 ## 3. Assets & The Projectile Prefab
 * **Box_prefab (Linked to `cubePrefab`):** This is the projectile asset stored in the **Assets Browser**.
   * **What it is:** A pre-configured 3D object (foam/cube) that is spawned dynamically into the scene during gameplay.
-  * **How it works:** It contains a `Mesh Renderer`, a `Material` (visuals), a `Physics Collider` (shape), and a `Physics Body`. It sits quietly in the Asset Browser until the user opens their mouth. When spawned by the `Main_script`, the script forces its `Physics Body` to become dynamic (`isDynamic = true`) and instantly applies a directional velocity vector to it, shooting it toward the Torus.
+  * **How it works:** It contains a `Mesh Renderer`, a `Material` (visuals) - foam_mat, a `Physics Collider` (shape), and a `Physics Body`. It sits quietly in the Asset Browser until the user opens their mouth. When spawned by the `Main_script`, the script forces its `Physics Body` to become dynamic (`isDynamic = true`) and instantly applies a directional velocity vector to it, shooting it toward the Torus.
 
 ---
 
@@ -41,10 +41,10 @@ The `Main_script` has several inputs exposed in the **Inspector** panel. This al
 
 **Game Balance Variables:**
 * `Game Duration` *(default: 30.0)*: Total gameplay time in seconds.
-* `Hole Radius` *(default: 3.0)*: The mathematical radius of the goal. If a `Box_prefab` falls within this distance from the center of the `ScoreZone`, it counts as a point.
+* `Hole Radius` *(set: 3.2)*: The mathematical radius of the goal. If a `Box_prefab` falls within this distance from the center of the `ScoreZone`, it counts as a point.
 * `Miss Penalty` *(default: 1.0)*: Points deducted if a projectile misses the hole or bounces away.
 * `Rotation Speed` *(default: {0.0, 1.0, 0.0})*: The vector defining how fast the Torus spins on the Y-axis.
-* `Spawn Interval` *(default: 0.5)*: The delay in seconds between each projectile spawn while the user's mouth is open.
+* `Spawn Interval` *(set: 0.05)*: The delay in seconds between each projectile spawn while the user's mouth is open.
 
 ---
 
