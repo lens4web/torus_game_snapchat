@@ -8,18 +8,19 @@ The game combines Lens Studio's built-in **Physics Engine** for projectile movem
 ---
 
 ## 2. Scene Hierarchy & Key Objects
-The scene is structured to handle UI, 3D tracking, and physics independently. Here are the core elements in the **Scene Hierarchy**:
+
+The scene is structured to handle UI, 3D tracking, and physics independently. Here are the core elements in the Scene Hierarchy:
 
 * **Orthographic Camera:** Renders the 2D UI elements over the screen.
   * **UI Canvas:** Contains the text components: `Text_Hint` ("Open mouth to start"), `Text_Score`, and `Text_Timer`.
 * **Camera:** The main 3D camera rendering the AR environment.
-  * **GameController:** An empty object that holds the `Main_script`. It acts as the central brain of the game, connecting all inputs and managing the game loop.
+* **GameController:** An empty object that holds the `Main_script`. It acts as the central brain of the game, connecting all inputs and managing the game loop.
 * **3D Upper Body Tracking:** Tracks the user's movements in 3D space.
-  * **Upper Body Mesh (Occluder):** This is a critical visual component. It is an invisible mesh that tracks to the user's head and shoulders. It acts as an **occluder**—meaning it masks out objects behind it. When the Torus rotates around the user, this mesh hides the back half of the Torus behind the user's head, creating a realistic 3D depth effect.
+  * **Upper Body Mesh (Occluder):** This is a critical visual component. It is an invisible mesh that tracks to the user's head and shoulders. It acts as an occluder—meaning it masks out objects behind it. When the Torus rotates around the user, this mesh hides the back half of the Torus behind the user's head, creating a realistic 3D depth effect.
 * **Floating Rush Funplex:** A 3D floating logo exported directly from the original project without modifications. It serves as static branding/decoration in the AR space.
-* **Torus (`objectToRotate`):** The 3D goal object. It rotates continuously around the user's head. It contains a `Physics Collider` so that projectiles can physically bounce off its rim.
-* **ScoreZone (`scoreZone`):** An invisible 3D Cylinder placed exactly inside the Torus hole (nested as a child so it moves with the Torus). 
-  * *Important Setup:* Its `Mesh Renderer` is disabled. It does NOT use physical trigger colliders. Instead, the script uses its exact 3D coordinates as a mathematical reference point to calculate whether a projectile passed through the hoop.
+* **Torus (`objectToRotate`):** The 3D goal object. It rotates continuously around the user's head. It contains a Physics Collider so that projectiles can physically bounce off its rim.
+  * **ScoreZone (`scoreZone`):** An invisible 3D Cylinder placed exactly inside the Torus hole (nested as a child so it moves with the Torus).
+    * *Important Setup:* Its Mesh Renderer is disabled. It does NOT use physical trigger colliders. Instead, the script uses its exact 3D coordinates as a mathematical reference point to calculate whether a projectile passed through the hoop.
 
 ---
 
@@ -51,7 +52,8 @@ The `Main_script` has several inputs exposed in the **Inspector** panel. This al
 ## 5. Core Logic & Mechanics
 
 ### A. Event System (Interactions)
-* **Face Tracking:** The script listens for `FaceFoundEvent` and `FaceLostEvent`. If the camera loses the user's face, the game pauses spawning projectiles to prevent errors.
+
+* **Face Tracking:** The script listens for `FaceFoundEvent` and `FaceLostEvent`. If the camera loses the user's face, the game pauses spawning projectiles to prevent errors. *Note: The game timer continues to count down even if the face tracking is temporarily lost.*
 * **Mouth Controls:** Controlled via `MouthOpenedEvent` and `MouthClosedEvent`. The very first time the mouth opens, the game hides the Hint Text, shows the Score/Timer, and starts the countdown. Keeping the mouth open generates a continuous flow of `Box_prefab` projectiles.
 
 ### B. Spawning & Physics
@@ -62,11 +64,13 @@ When the mouth is open, the `spawnCube()` function runs based on the `Spawn Inte
 4. It sets a physical velocity (`launchVector = new vec3(5.0, 10.0, -10.0)`), launching the box upward and forward.
 
 ### C. Scoring System (Anti-Tunneling)
+
 To prevent fast projectiles from glitching through the Torus mesh:
-1. The `checkCubesStatus()` function tracks the height (Y-axis) of every spawned `Box_prefab`.
-2. When a box drops below the height of the `ScoreZone`, the script calculates its 2D horizontal distance (X and Z axis) from the center of the hole.
-3. **Hit (+1 point):** If the distance is less than or equal to `Hole Radius`.
-4. **Miss (-1 point):** If the distance is greater than the radius (meaning it bounced off the Torus or missed entirely).
+
+* The `checkCubesStatus()` function tracks the height (Y-axis) of every spawned `Box_prefab`.
+* When a box drops below the height of the `ScoreZone`, the script calculates its 2D horizontal distance (X and Z axis) from the center of the hole.
+* **Hit (+1 point):** If the distance is less than or equal to `Hole Radius`.
+* **Miss (-1 point):** If the distance is greater than the radius (meaning it bounced off the Torus or missed entirely). *Note: Built-in math logic ensures the total score can never drop below zero.*
 
 ### D. Memory Optimization (Garbage Collection)
 To keep the game optimized and prevent it from crashing on older phones, old projectiles must be deleted. Once a `Box_prefab` falls 50 units below the Torus, the script calls `cube.destroy()`, completely removing it from the device's memory.
