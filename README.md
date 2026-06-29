@@ -1,32 +1,81 @@
-# AR Torus Game: Project Documentation
+# Technical Documentation: AR Torus Game
 
-## 1. Overview
-This project is an interactive Augmented Reality (AR) game developed for Snapchat using Lens Studio. The core concept revolves around a rotating goal (a Torus) circling the user's head. The player's objective is to shoot projectiles (cubes/foam) into the moving goal within a limited timeframe to achieve the highest score possible.
+## 1. Project Overview
+This project is a Face-Tracking AR game built in Snapchat's Lens Studio. The user controls the game by opening their mouth to shoot projectiles (cubes/foam) at a rotating goal (a Torus). 
 
-## 2. User Controls & Interaction
-The game is completely hands-free and controlled via Snap's built-in Face Tracking technology:
-* **Face Tracking:** The lens anchors the game environment to the user's face.
-* **Mouth Open:** Acts as the primary trigger. Opening the mouth for the first time starts the game timer. Keeping the mouth continuously open generates a steady stream of projectiles.
-* **Mouth Close:** Instantly pauses the generation of projectiles.
+The game uses Lens Studio's built-in **Physics Engine** for projectile movement, but uses **coordinate-based math** for scoring to prevent physics bugs (like objects passing through solid walls at high speeds).
 
-## 3. Project Structure
-The Scene Hierarchy and Asset Browser are organized into a few essential components to ensure smooth performance:
+---
 
-* **The Goal (Torus):** A 3D Torus object that continuously rotates. It acts as the physical rim of the goal.
-* **The Projectile (Cube Prefab):** A dynamic 3D object stored in the Assets browser. It possesses physics properties (velocity, gravity) and is instantiated dynamically during gameplay.
-* **The Score Zone (Invisible Cylinder):** A transparent 3D cylinder nested precisely inside the Torus hole. This is a critical structural element used to calculate accurate scoring without relying on heavy physics collisions.
-* **UI Canvas:** * *Hint Text:* Prompts the user to start the game.
-    * *Score Text:* Tracks the live score.
-    * *Timer Text:* Displays the countdown.
-* **Game Manager / Spawner:** An empty 3D object in the scene that holds the main logic, linking the UI, physical objects, and user interactions together.
+## 2. Scene Hierarchy & Key Objects
+To maintain this project, it is important to understand the main objects in the **Scene Hierarchy**:
 
-## 4. Core Mechanics & Functionality
-* **Game Initialization:** Upon launching the lens, the UI prompts the user to open their mouth. The timer and score are hidden until the first interaction.
-* **Spawning & Physics:** While the user's mouth is open, projectiles spawn at a set interval (e.g., every 0.5 seconds). They are assigned an immediate physical velocity, launching them toward the rotating Torus.
-* **Scoring System (Anti-Tunneling Logic):** To prevent fast-moving projectiles from glitching through colliders (a common physics issue called "tunneling"), the scoring relies on coordinate-based math. 
-    * The system constantly tracks the Y-axis position of falling projectiles.
-    * When a projectile drops below the invisible Score Zone's height, the game calculates its exact distance from the center of the hole.
-    * **Hit (+1 point):** The projectile falls cleanly inside the hole's radius.
-    * **Miss (-1 point):** The projectile falls outside the radius or bounces off the Torus edge.
-* **Resource Optimization:** To maintain a high frame rate and prevent device overheating, any projectile that falls far below the screen is automatically destroyed and wiped from the device's memory.
-* **Game Over:** Once the timer reaches zero, the game ends. Spawning is disabled, all active projectiles are cleared from the screen, and the final score is locked.
+* **Camera / Orthographic Camera:** Renders the 3D environment and the 2D UI Canvas.
+* **GameController (Empty Object):** This object holds the main JavaScript and connects all the inputs.
+* **Torus (`objectToRotate`):** The 3D goal object. It rotates continuously. 
+  * *Required Components:* Needs a `Physics Collider` (set to Static or Kinematic) so projectiles can bounce off its edges.
+* **ScoreZone (`scoreZone`):** An invisible 3D Cylinder placed exactly inside the Torus hole. It is a child of the Torus (it moves with it).
+  * *Important Setup:* Its `Mesh Renderer` must be **disabled** (unchecked) so it remains invisible. It does NOT use physical colliders for scoring. The script uses its World Position to calculate hits.
+* **UI Canvas:**
+  * `hintText`: Displays instructions ("Open mouth to start").
+  * `scoreText`: Displays the current score.
+  * `timerText`: Displays the remaining time.
+
+---
+
+## 3. Assets & Materials
+* **CubePrefab (`cubePrefab`):** The projectile object stored in the **Assets Browser**.
+  * *Required Components:* * `Mesh Renderer` and `Material` (defines how the projectile looks).
+    * `Physics Collider` (Box or Sphere shape).
+    * `Physics Body` (The script automatically sets this to dynamic when spawned).
+
+---
+
+## 4. Adjustable Properties (Inspector Setup)
+The main script has several `@input` variables. You can change these in the **Inspector** panel without editing the code. This makes balancing the game easy.
+
+**Object Links:**
+* `cubePrefab` *(Asset.ObjectPrefab)*: The projectile to spawn.
+* `objectToRotate` *(SceneObject)*: The Torus goal.
+* `scoreZone` *(SceneObject)*: The invisible reference point for scoring.
+* `scoreText`, `hintText`, `timerText` *(Component.Text)*: Links to the UI text elements.
+
+**Game Balance Settings:**
+* `gameDuration` *(float, default: 30.0)*: Total game time in seconds.
+* `holeRadius` *(float, default: 3.0)*: The size of the scoring area. If a projectile is within this distance from the `scoreZone` center, it counts as a hit.
+* `missPenalty` *(float, default: 1.0)*: Points deducted for a missed shot.
+* `rotationSpeed` *(vec3, default: {0.0, 1.0, 0.0})*: The XYZ rotation speed of the Torus.
+* `spawnInterval` *(float, default: 0.5)*: Time delay (in seconds) between each spawned projectile while the mouth is open.
+
+---
+
+## 5. Core Logic & Code Mechanics
+
+### A. Event System (Interactions)
+* **Face Tracking:** The script listens for `FaceFoundEvent` and `FaceLostEvent`. If the face is lost, the game pauses spawning.
+* **Mouth Controls:** The game uses `MouthOpenedEvent` and `MouthClosedEvent`. The very first time the user opens their mouth, the script hides the Hint Text, shows the Score/Timer, and starts the game loop.
+
+### B. Spawning & Physics
+When the mouth is open, the `spawnCube()` function runs every `spawnInterval` seconds:
+1. It creates a copy of the `cubePrefab`.
+2. It adds a small random X and Z offset (`offsetRange = 0.5`) so projectiles don't fly in a perfectly straight line.
+3. It uses a `DelayedCallbackEvent` (set to 0.0 seconds). This is a required technical fix in Lens Studio to make sure the object is fully loaded before applying physics forces.
+4. It applies a physical velocity (`launchVector = new vec3(5.0, 10.0, -10.0)`). 
+
+### C. Scoring System (Anti-Tunneling)
+To prevent fast projectiles from glitching through the Torus, the script avoids physics triggers and uses a math-based approach:
+1. The `checkCubesStatus()` function constantly checks the Y-axis (height) of every active projectile.
+2. If a projectile falls below the `scoreZone` height, the script calculates the 2D distance (X and Z axis) between the projectile and the center of the hole.
+3. If the distance is less than or equal to `holeRadius`, the player gets **+1 point**.
+4. If the distance is greater (meaning it bounced off the rim or missed entirely), the player loses points (`missPenalty`).
+
+### D. Memory Optimization (Garbage Collection)
+To keep the frame rate high and prevent device crashes, the script cleans up old objects. Once a projectile falls 50 units below the Torus (`zonePos.y - 50.0`), the script calls `cube.destroy()` to remove it from the device memory.
+
+---
+
+## 6. Developer Guide: How to Customize
+If you need to make changes to the game feel, look for these specific areas in the code:
+* **Change Shooting Direction/Speed:** Find the `launchVector` variable inside the `spawnCube()` function. Change the X, Y, and Z values to make the projectiles shoot higher, faster, or further.
+* **Change the Spawn Spread:** Adjust the `offsetRange` variable inside `spawnCube()`. A higher number makes the projectiles scatter more.
+* **Fix Unfair Misses:** If valid hits are counting as misses, go to the script Inspector and increase the `holeRadius` value slightly.
